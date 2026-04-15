@@ -1,0 +1,4 @@
+flask
+pandas
+twilio
+gunicorn
