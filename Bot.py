@@ -4,70 +4,73 @@ from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
-# 🔥 Detectar separador automáticamente
-try:
-    data = pd.read_csv("datos.csv", dtype=str, sep=None, engine='python')
-except:
-    data = pd.read_csv("datos.csv", dtype=str)
+# Leer Excel
+data = pd.read_excel("datos.xlsx")
 
-# Limpiar nombres de columnas
+# Limpiar nombres de columnas (por si vienen raros)
 data.columns = data.columns.str.strip()
 
-print("COLUMNAS DETECTADAS:")
-print(data.columns)
-
-# Detectar columna de cédula (la que contenga 'cedula')
-columna_cedula = None
-for col in data.columns:
-    if "cedula" in col.lower():
-        columna_cedula = col
-        break
-
-# Si no la encuentra, usa la primera
-if columna_cedula is None:
-    columna_cedula = data.columns[0]
-
-print("COLUMNA USADA PARA CÉDULA:", columna_cedula)
-
-# Limpiar cédulas del archivo
-data[columna_cedula] = data[columna_cedula].astype(str)
-data[columna_cedula] = data[columna_cedula].str.replace(".", "", regex=False)
-data[columna_cedula] = data[columna_cedula].str.replace(",", "", regex=False)
-data[columna_cedula] = data[columna_cedula].str.replace(" ", "", regex=False)
-data[columna_cedula] = data[columna_cedula].str.strip()
-
-print("CÉDULAS EN EL ARCHIVO:")
-print(data[columna_cedula].head(10))
+# Diccionario para guardar estado de usuarios
+usuarios = {}
 
 @app.route("/bot", methods=["POST"])
 def bot():
-    incoming_msg = request.values.get("Body", "").strip()
-    
-    respuesta = MessagingResponse()
-    msg = respuesta.message()
+    incoming_msg = request.values.get('Body', '').strip()
+    numero = request.values.get('From', '')
 
-    # Limpiar cédula del usuario
-    cedula_usuario = incoming_msg.replace(".", "").replace(",", "").replace(" ", "").strip()
+    resp = MessagingResponse()
+    msg = resp.message()
 
-    print("CÉDULA RECIBIDA:", cedula_usuario)
+    # 🔹 Si el usuario manda SI o NO
+    if incoming_msg.lower() in ["si", "sí", "no"]:
+        if numero in usuarios:
+            cedula = usuarios[numero]
 
-    # Buscar
-    resultado = data[data[columna_cedula] == cedula_usuario]
+            if incoming_msg.lower() in ["si", "sí"]:
+                respuesta = "SI"
+                msg.body("✅ Gracias por confirmar tu asistencia. Te esperamos 🙌")
+            else:
+                respuesta = "NO"
+                msg.body("❌ Gracias por informarnos. Tendremos en cuenta tu ausencia.")
+
+            print(f"CÉDULA {cedula} respondió: {respuesta}")
+
+            # Aquí luego guardamos en Excel o Sheets
+            return str(resp)
+        else:
+            msg.body("⚠️ Primero envía tu cédula.")
+            return str(resp)
+
+    # 🔹 Si el usuario manda cédula
+    cedula = incoming_msg
+
+    # Buscar en Excel
+    resultado = data[data['Cedula'].astype(str).str.strip() == cedula]
 
     if not resultado.empty:
         fila = resultado.iloc[0]
-        reply = f"""Hola 👋
-📍 Lugar: {fila.get('Lugar', 'No disponible')}
-🕒 Citación: {fila.get('Hora', fila.get('Fecha y hora', 'No disponible'))}
-💼 Vacante: {fila.get('Vacante', 'No disponible')}"""
+
+        # Guardar estado
+        usuarios[numero] = cedula
+
+        respuesta = f"""
+Hola {fila['Nombre']} 👋
+
+📌 Vacante: {fila['Vacante']}
+📍 Lugar: {fila['Lugar']}
+🕒 Hora: {fila['Hora']}
+
+¿Confirmas asistencia?
+Responde SI o NO
+"""
+        msg.body(respuesta)
+
     else:
-        reply = "❌ No encontramos tu cédula. Verifica e intenta nuevamente."
+        msg.body("❌ No encontramos tu cédula. Verifica e intenta de nuevo.")
 
-    msg.body(reply)
-    return str(respuesta)
-
-import os
+    return str(resp)
 
 if __name__ == "__main__":
+    import os
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
