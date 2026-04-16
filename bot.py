@@ -1,76 +1,72 @@
-from flask import Flask, request
+from flask import Flask, request, render_template
 import pandas as pd
 from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
-# Leer Excel
-data = pd.read_excel("datos.xlsx")
+# Leer archivo CSV
+data = pd.read_csv("datos.csv", dtype=str)
 
-# Limpiar nombres de columnas (por si vienen raros)
+# Limpiar nombres de columnas (por si hay espacios o caracteres raros)
 data.columns = data.columns.str.strip()
 
-# Diccionario para guardar estado de usuarios
-usuarios = {}
+print("COLUMNAS DETECTADAS:")
+print(data.columns)
 
+# =========================
+# 🌐 RUTA WEB (Render)
+# =========================
+@app.route("/", methods=["GET", "POST"])
+def home():
+    resultado = None
+
+    if request.method == "POST":
+        cedula = request.form.get("cedula").strip()
+
+        resultado_df = data[data['Cedula'].str.strip() == cedula]
+
+        if not resultado_df.empty:
+            resultado = resultado_df.iloc[0]
+
+    return render_template("index.html", resultado=resultado)
+
+
+# =========================
+# 📲 RUTA WHATSAPP (Twilio)
+# =========================
 @app.route("/bot", methods=["POST"])
 def bot():
     incoming_msg = request.values.get('Body', '').strip()
-    numero = request.values.get('From', '')
+
+    print("CÉDULA RECIBIDA:", incoming_msg)
+
+    resultado = data[data['Cedula'].str.strip() == incoming_msg]
 
     resp = MessagingResponse()
-    msg = resp.message()
-
-    # 🔹 Si el usuario manda SI o NO
-    if incoming_msg.lower() in ["si", "sí", "no"]:
-        if numero in usuarios:
-            cedula = usuarios[numero]
-
-            if incoming_msg.lower() in ["si", "sí"]:
-                respuesta = "SI"
-                msg.body("✅ Gracias por confirmar tu asistencia. Te esperamos 🙌")
-            else:
-                respuesta = "NO"
-                msg.body("❌ Gracias por informarnos. Tendremos en cuenta tu ausencia.")
-
-            print(f"CÉDULA {cedula} respondió: {respuesta}")
-
-            # Aquí luego guardamos en Excel o Sheets
-            return str(resp)
-        else:
-            msg.body("⚠️ Primero envía tu cédula.")
-            return str(resp)
-
-    # 🔹 Si el usuario manda cédula
-    cedula = incoming_msg
-
-    # Buscar en Excel
-    resultado = data[data['Cedula'].astype(str).str.strip() == cedula]
 
     if not resultado.empty:
         fila = resultado.iloc[0]
 
-        # Guardar estado
-        usuarios[numero] = cedula
-
-        respuesta = f"""
+        mensaje = f"""
 Hola {fila['Nombre']} 👋
 
 📌 Vacante: {fila['Vacante']}
 📍 Lugar: {fila['Lugar']}
-🕒 Hora: {fila['Hora']}
+⏰ Hora: {fila['Hora']}
 
-¿Confirmas asistencia?
-Responde SI o NO
+Por favor responde:
+👉 SI para confirmar asistencia
+👉 NO si no asistirás
 """
-        msg.body(respuesta)
-
     else:
-        msg.body("❌ No encontramos tu cédula. Verifica e intenta de nuevo.")
+        mensaje = "❌ No encontramos tu cédula. Verifica e intenta nuevamente."
 
+    resp.message(mensaje)
     return str(resp)
 
+
+# =========================
+# 🚀 INICIO APP
+# =========================
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
