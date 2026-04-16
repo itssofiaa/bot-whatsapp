@@ -1,14 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Consulta de Citación</title>
+    <meta charset="UTF-8">
+    <title>Consulta de citación</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        input {
+            padding: 10px;
+            width: 250px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #6c63ff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #5848c2;
+        }
+    </style>
 </head>
 <body>
-    <h1>Consulta tu citación</h1>
 
-    <form action="/buscar" method="post">
-        <input type="text" name="cedula" placeholder="Ingresa tu cédula" required>
-        <button type="submit">Buscar</button>
-    </form>
+    <div class="container">
+        <h2>Consulta tu citación</h2>
+
+        <form method="POST" action="/consultar">
+            <input type="text" name="cedula" placeholder="Ingresa tu cédula" required>
+            <br>
+            <button type="submit">Consultar</button>
+        </form>
+    </div>
+
 </body>
 </html>
