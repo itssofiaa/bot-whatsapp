@@ -1,31 +1,17 @@
 from flask import Flask, request, render_template
 import pandas as pd
-import sqlite3
+import os
+from supabase import create_client
 
 app = Flask(__name__)
 
-# 🔥 BASE DE DATOS
-def guardar_respuesta(cedula, respuesta):
-    conn = sqlite3.connect("respuestas.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS respuestas (
-            cedula TEXT,
-            respuesta TEXT
-        )
-    """)
-
-    cursor.execute("""
-        INSERT INTO respuestas (cedula, respuesta)
-        VALUES (?, ?)
-    """, (cedula, respuesta))
-
-    conn.commit()
-    conn.close()
+# 🔥 CONEXIÓN SUPABASE
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+supabase = create_client(url, key)
 
 
-# 🔥 Leer CSV
+# 🔹 Leer CSV (solo para consulta)
 def cargar_datos():
     df = pd.read_csv("datos.csv", sep=None, engine="python")
     df.columns = df.columns.str.strip()
@@ -43,13 +29,13 @@ def limpiar_cedula(valor):
     return ''.join(filter(str.isdigit, str(valor)))
 
 
-# 🔥 HOME
+# 🔹 HOME
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
-# 🔥 CONSULTAR
+# 🔹 CONSULTAR
 @app.route("/consultar", methods=["POST"])
 def consultar():
     df = cargar_datos()
@@ -83,33 +69,21 @@ def consultar():
     """
 
 
-# 🔥 CONFIRMAR (GUARDA EN DB)
+# 🔥 GUARDAR EN SUPABASE
 @app.route("/confirmar", methods=["POST"])
 def confirmar():
     cedula = limpiar_cedula(request.form.get("cedula"))
     respuesta = request.form.get("respuesta")
 
-    guardar_respuesta(cedula, respuesta)
+    supabase.table("respuestas").insert({
+        "cedula": cedula,
+        "respuesta": respuesta
+    }).execute()
 
     return """
     <h2>✅ Respuesta guardada</h2>
-    <p>Gracias por confirmar</p>
+    <p>Gracias por confirmar tu asistencia</p>
     """
-
-
-# 🔒 OPCIONAL: VER RESPUESTAS (PROTEGER)
-@app.route("/admin")
-def admin():
-    clave = request.args.get("clave")
-
-    if clave != "1234":  # 🔥 cámbiala
-        return "⛔ Acceso denegado"
-
-    conn = sqlite3.connect("respuestas.db")
-    df = pd.read_sql_query("SELECT * FROM respuestas", conn)
-    conn.close()
-
-    return df.to_html()
 
 
 if __name__ == "__main__":
