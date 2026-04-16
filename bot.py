@@ -70,4 +70,4 @@ def consultar():
 
 # Ejecutar app
 if __name__ == "__main__":
-    app.run()g
+    app.run()
