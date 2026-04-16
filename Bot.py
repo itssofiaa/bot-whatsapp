@@ -5,7 +5,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 app = Flask(__name__)
 
 # Leer Excel
-data = pd.read_excel("datos.csv)
+data = pd.read_csv("datos.csv", encoding='utf-8-sig')
 
 # Limpiar nombres de columnas (por si vienen raros)
 data.columns = data.columns.str.strip()
