@@ -3,16 +3,19 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# 🔥 LEER CSV CON TABULADOR
-data = pd.read_csv("datos.csv", sep="\t")
+# 🔥 Leer archivo detectando separador automáticamente
+data = pd.read_csv("datos.csv", sep=None, engine="python")
 
-# Limpiar nombres de columnas
+# 🔥 Limpiar nombres de columnas
 data.columns = data.columns.str.strip()
 
-print("COLUMNAS DISPONIBLES:")
+print("COLUMNAS DETECTADAS:")
 print(data.columns)
 
-# Detectar columna de cédula
+print("PRIMERAS FILAS:")
+print(data.head())
+
+# 🔥 Detectar columna de cédula automáticamente
 col_cedula = None
 for col in data.columns:
     if "cedula" in col.lower():
@@ -22,15 +25,18 @@ for col in data.columns:
 print("COLUMNA DE CÉDULA USADA:", col_cedula)
 
 
+# 🔥 Función para limpiar cédulas (solo números)
 def limpiar_cedula(valor):
     return ''.join(filter(str.isdigit, str(valor)))
 
 
+# 🔥 Ruta principal
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
+# 🔥 Ruta para consultar
 @app.route("/consultar", methods=["POST"])
 def consultar():
     cedula_input = request.form.get("cedula")
@@ -38,11 +44,19 @@ def consultar():
     if not col_cedula:
         return "❌ Error: no se encontró la columna de cédula"
 
+    # 🔥 limpiar entrada usuario
     cedula_limpia = limpiar_cedula(cedula_input)
 
-    # limpiar columna
+    print("CÉDULA INGRESADA:", cedula_input)
+    print("CÉDULA LIMPIA:", cedula_limpia)
+
+    # 🔥 limpiar columna completa
     data[col_cedula] = data[col_cedula].apply(limpiar_cedula)
 
+    print("CÉDULAS EN DATA:")
+    print(data[col_cedula].head(10))
+
+    # 🔥 buscar
     resultado = data[data[col_cedula] == cedula_limpia]
 
     if resultado.empty:
@@ -59,5 +73,6 @@ def consultar():
     """
 
 
+# 🔥 Ejecutar app
 if __name__ == "__main__":
     app.run()
