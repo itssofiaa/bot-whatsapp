@@ -3,11 +3,11 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# 🔥 ACTIVAR DEBUG (CLAVE)
+# 🔥 DEBUG ACTIVADO
 app.config["DEBUG"] = True
 
 
-# 🔥 Función para leer datos
+# 🔥 Leer datos siempre actualizados
 def cargar_datos():
     df = pd.read_csv("datos.csv", sep=None, engine="python")
     df.columns = df.columns.str.strip()
@@ -58,15 +58,16 @@ def consultar():
     <p>🕒 Hora: {fila['Hora']}</p>
     <p>💼 Vacante: {fila['Vacante']}</p>
 
+    <h3>¿Confirmas tu asistencia?</h3>
     <form action="/confirmar" method="POST">
         <input type="hidden" name="cedula" value="{cedula_limpia}">
-        <button name="respuesta" value="SI">Sí asistiré</button>
-        <button name="respuesta" value="NO">No asistiré</button>
+        <button name="respuesta" value="SI">✅ Sí asistiré</button>
+        <button name="respuesta" value="NO">❌ No asistiré</button>
     </form>
     """
 
 
-# 🔥 CONFIRMAR (SIN RIESGO)
+# 🔥 CONFIRMAR ASISTENCIA
 @app.route("/confirmar", methods=["POST"])
 def confirmar():
     df = cargar_datos()
@@ -77,33 +78,40 @@ def confirmar():
 
     df[col_cedula] = df[col_cedula].apply(limpiar_cedula)
 
+    # 🔥 Crear columna si no existe
     if "Asistencia" not in df.columns:
         df["Asistencia"] = ""
 
+    # 🔥 FORZAR A TEXTO (SOLUCIONA TU ERROR)
+    df["Asistencia"] = df["Asistencia"].astype(str)
+
+    # 🔥 Guardar respuesta
     df.loc[df[col_cedula] == cedula, "Asistencia"] = respuesta
 
-    # 🔥 GUARDAR SIN FALLAR
+    # 🔥 Guardar en carpeta segura de Render
     df.to_csv("/tmp/datos_actualizados.csv", index=False)
 
     return f"""
-    <h2>✅ Guardado</h2>
-    <p>{respuesta}</p>
-    <a href="/ver">Ver datos</a>
+    <h2>✅ Respuesta guardada</h2>
+    <p>Tu respuesta: <b>{respuesta}</b></p>
+    <br>
+    <a href="/ver">🔎 Ver todas las respuestas</a>
     """
 
 
-# 🔥 VER
+# 🔥 VER RESPUESTAS
 @app.route("/ver")
 def ver():
     df = cargar_datos()
     return df.to_html()
 
 
-# 🔥 ERROR HANDLER GLOBAL
+# 🔥 CAPTURAR ERRORES
 @app.errorhandler(Exception)
 def handle_error(e):
     return f"❌ ERROR REAL:<br><br>{str(e)}", 500
 
 
+# 🔥 RUN
 if __name__ == "__main__":
     app.run()
