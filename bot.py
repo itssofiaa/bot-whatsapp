@@ -22,7 +22,7 @@ for col in data.columns:
 print("COLUMNA DE CÉDULA USADA:", col_cedula)
 
 
-# 🔥 Función para limpiar cédula (solo números)
+# 🔥 Función para limpiar cédula
 def limpiar_cedula(valor):
     return ''.join(filter(str.isdigit, str(valor)))
 
@@ -69,9 +69,11 @@ def consultar():
     """
 
 
-# 🔥 Guardar respuesta
+# 🔥 Confirmar asistencia
 @app.route("/confirmar", methods=["POST"])
 def confirmar():
+    global data
+
     cedula = request.form.get("cedula")
     respuesta = request.form.get("respuesta")
 
@@ -80,11 +82,15 @@ def confirmar():
     # limpiar columna
     data[col_cedula] = data[col_cedula].apply(limpiar_cedula)
 
+    # 🔥 crear columna si no existe
+    if "Asistencia" not in data.columns:
+        data["Asistencia"] = ""
+
     # 🔥 actualizar asistencia
     data.loc[data[col_cedula] == cedula, "Asistencia"] = respuesta
 
-    # 🔥 guardar archivo
-    data.to_csv("datos.csv", index=False)
+    # 🔥 guardar en archivo NUEVO (evita error en Render)
+    data.to_csv("datos_actualizados.csv", index=False)
 
     return f"""
     <h2>✅ Respuesta guardada</h2>
@@ -94,7 +100,7 @@ def confirmar():
     """
 
 
-# 🔥 VER TODOS LOS DATOS
+# 🔥 Ver todos los datos
 @app.route("/ver")
 def ver():
     return data.to_html()
