@@ -12,7 +12,7 @@ data.columns = data.columns.str.strip()
 print("COLUMNAS DISPONIBLES:")
 print(data.columns)
 
-# Detectar automáticamente la columna de cédula
+# Detectar columna de cédula automáticamente
 col_cedula = None
 for col in data.columns:
     if "cedula" in col.lower():
@@ -22,7 +22,12 @@ for col in data.columns:
 print("COLUMNA DE CÉDULA USADA:", col_cedula)
 
 
-# Ruta principal (página web)
+# FUNCIÓN para limpiar texto (solo números)
+def limpiar_cedula(valor):
+    return ''.join(filter(str.isdigit, str(valor)))
+
+
+# Ruta principal
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -31,28 +36,25 @@ def home():
 # Ruta para consultar
 @app.route("/consultar", methods=["POST"])
 def consultar():
-    cedula = request.form.get("cedula")
+    cedula_input = request.form.get("cedula")
 
     if not col_cedula:
-        return "❌ Error: no se encontró la columna de cédula en el archivo"
+        return "❌ Error: no se encontró la columna de cédula"
 
-    # Limpiar entrada del usuario
-    cedula = str(cedula).strip()
+    # 🔥 LIMPIAR ENTRADA DEL USUARIO
+    cedula_limpia = limpiar_cedula(cedula_input)
 
-    # Limpiar columna de cédula en el DataFrame
-    data[col_cedula] = (
-        data[col_cedula]
-        .astype(str)
-        .str.replace(".0", "", regex=False)
-        .str.strip()
-    )
+    print("CÉDULA INGRESADA:", cedula_input)
+    print("CÉDULA LIMPIA:", cedula_limpia)
 
-    print("CÉDULA INGRESADA:", cedula)
+    # 🔥 LIMPIAR TODA LA COLUMNA UNA VEZ
+    data[col_cedula] = data[col_cedula].apply(limpiar_cedula)
+
     print("CÉDULAS EN DATA:")
     print(data[col_cedula].head(10))
 
-    # Filtrar resultados
-    resultado = data[data[col_cedula] == cedula]
+    # Buscar coincidencia
+    resultado = data[data[col_cedula] == cedula_limpia]
 
     if resultado.empty:
         return "❌ No se encontró la cédula"
@@ -68,6 +70,5 @@ def consultar():
     """
 
 
-# Ejecutar app
 if __name__ == "__main__":
     app.run()
