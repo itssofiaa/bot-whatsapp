@@ -12,10 +12,7 @@ data.columns = data.columns.str.strip()
 print("COLUMNAS DETECTADAS:")
 print(data.columns)
 
-print("PRIMERAS FILAS:")
-print(data.head())
-
-# 🔥 Detectar columna de cédula automáticamente
+# 🔥 Detectar columna de cédula
 col_cedula = None
 for col in data.columns:
     if "cedula" in col.lower():
@@ -25,7 +22,7 @@ for col in data.columns:
 print("COLUMNA DE CÉDULA USADA:", col_cedula)
 
 
-# 🔥 Función para limpiar cédulas (solo números)
+# 🔥 Función para limpiar cédula (solo números)
 def limpiar_cedula(valor):
     return ''.join(filter(str.isdigit, str(valor)))
 
@@ -36,7 +33,7 @@ def home():
     return render_template("index.html")
 
 
-# 🔥 Ruta para consultar
+# 🔥 Consultar cédula
 @app.route("/consultar", methods=["POST"])
 def consultar():
     cedula_input = request.form.get("cedula")
@@ -44,19 +41,11 @@ def consultar():
     if not col_cedula:
         return "❌ Error: no se encontró la columna de cédula"
 
-    # 🔥 limpiar entrada usuario
     cedula_limpia = limpiar_cedula(cedula_input)
 
-    print("CÉDULA INGRESADA:", cedula_input)
-    print("CÉDULA LIMPIA:", cedula_limpia)
-
-    # 🔥 limpiar columna completa
+    # limpiar columna
     data[col_cedula] = data[col_cedula].apply(limpiar_cedula)
 
-    print("CÉDULAS EN DATA:")
-    print(data[col_cedula].head(10))
-
-    # 🔥 buscar
     resultado = data[data[col_cedula] == cedula_limpia]
 
     if resultado.empty:
@@ -70,7 +59,45 @@ def consultar():
     <p>📍 Lugar: {fila['Lugar']}</p>
     <p>🕒 Hora: {fila['Hora']}</p>
     <p>💼 Vacante: {fila['Vacante']}</p>
+
+    <h3>¿Confirmas tu asistencia?</h3>
+    <form action="/confirmar" method="POST">
+        <input type="hidden" name="cedula" value="{cedula_limpia}">
+        <button name="respuesta" value="SI">✅ Sí asistiré</button>
+        <button name="respuesta" value="NO">❌ No asistiré</button>
+    </form>
     """
+
+
+# 🔥 Guardar respuesta
+@app.route("/confirmar", methods=["POST"])
+def confirmar():
+    cedula = request.form.get("cedula")
+    respuesta = request.form.get("respuesta")
+
+    cedula = limpiar_cedula(cedula)
+
+    # limpiar columna
+    data[col_cedula] = data[col_cedula].apply(limpiar_cedula)
+
+    # 🔥 actualizar asistencia
+    data.loc[data[col_cedula] == cedula, "Asistencia"] = respuesta
+
+    # 🔥 guardar archivo
+    data.to_csv("datos.csv", index=False)
+
+    return f"""
+    <h2>✅ Respuesta guardada</h2>
+    <p>Tu respuesta fue: <b>{respuesta}</b></p>
+    <br>
+    <a href="/ver">🔎 Ver todas las respuestas</a>
+    """
+
+
+# 🔥 VER TODOS LOS DATOS
+@app.route("/ver")
+def ver():
+    return data.to_html()
 
 
 # 🔥 Ejecutar app
