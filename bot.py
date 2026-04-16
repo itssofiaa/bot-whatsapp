@@ -3,50 +3,48 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# 🔥 Leer archivo detectando separador automáticamente
-data = pd.read_csv("datos.csv", sep=None, engine="python")
+# 🔥 ACTIVAR DEBUG (CLAVE)
+app.config["DEBUG"] = True
 
-# 🔥 Limpiar nombres de columnas
-data.columns = data.columns.str.strip()
 
-print("COLUMNAS DETECTADAS:")
-print(data.columns)
+# 🔥 Función para leer datos
+def cargar_datos():
+    df = pd.read_csv("datos.csv", sep=None, engine="python")
+    df.columns = df.columns.str.strip()
+    return df
+
 
 # 🔥 Detectar columna de cédula
-col_cedula = None
-for col in data.columns:
-    if "cedula" in col.lower():
-        col_cedula = col
-        break
-
-print("COLUMNA DE CÉDULA USADA:", col_cedula)
+def obtener_columna_cedula(df):
+    for col in df.columns:
+        if "cedula" in col.lower():
+            return col
+    return None
 
 
-# 🔥 Función para limpiar cédula
+# 🔥 Limpiar cédula
 def limpiar_cedula(valor):
     return ''.join(filter(str.isdigit, str(valor)))
 
 
-# 🔥 Ruta principal
+# 🔥 HOME
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
-# 🔥 Consultar cédula
+# 🔥 CONSULTAR
 @app.route("/consultar", methods=["POST"])
 def consultar():
+    df = cargar_datos()
+    col_cedula = obtener_columna_cedula(df)
+
     cedula_input = request.form.get("cedula")
-
-    if not col_cedula:
-        return "❌ Error: no se encontró la columna de cédula"
-
     cedula_limpia = limpiar_cedula(cedula_input)
 
-    # limpiar columna
-    data[col_cedula] = data[col_cedula].apply(limpiar_cedula)
+    df[col_cedula] = df[col_cedula].apply(limpiar_cedula)
 
-    resultado = data[data[col_cedula] == cedula_limpia]
+    resultado = df[df[col_cedula] == cedula_limpia]
 
     if resultado.empty:
         return "❌ No se encontró la cédula"
@@ -60,52 +58,52 @@ def consultar():
     <p>🕒 Hora: {fila['Hora']}</p>
     <p>💼 Vacante: {fila['Vacante']}</p>
 
-    <h3>¿Confirmas tu asistencia?</h3>
     <form action="/confirmar" method="POST">
         <input type="hidden" name="cedula" value="{cedula_limpia}">
-        <button name="respuesta" value="SI">✅ Sí asistiré</button>
-        <button name="respuesta" value="NO">❌ No asistiré</button>
+        <button name="respuesta" value="SI">Sí asistiré</button>
+        <button name="respuesta" value="NO">No asistiré</button>
     </form>
     """
 
 
-# 🔥 Confirmar asistencia
+# 🔥 CONFIRMAR (SIN RIESGO)
 @app.route("/confirmar", methods=["POST"])
 def confirmar():
-    global data
+    df = cargar_datos()
+    col_cedula = obtener_columna_cedula(df)
 
-    cedula = request.form.get("cedula")
+    cedula = limpiar_cedula(request.form.get("cedula"))
     respuesta = request.form.get("respuesta")
 
-    cedula = limpiar_cedula(cedula)
+    df[col_cedula] = df[col_cedula].apply(limpiar_cedula)
 
-    # limpiar columna
-    data[col_cedula] = data[col_cedula].apply(limpiar_cedula)
+    if "Asistencia" not in df.columns:
+        df["Asistencia"] = ""
 
-    # 🔥 crear columna si no existe
-    if "Asistencia" not in data.columns:
-        data["Asistencia"] = ""
+    df.loc[df[col_cedula] == cedula, "Asistencia"] = respuesta
 
-    # 🔥 actualizar asistencia
-    data.loc[data[col_cedula] == cedula, "Asistencia"] = respuesta
-
-    # 🔥 guardar en archivo NUEVO (evita error en Render)
-    data.to_csv("datos_actualizados.csv", index=False)
+    # 🔥 GUARDAR SIN FALLAR
+    df.to_csv("/tmp/datos_actualizados.csv", index=False)
 
     return f"""
-    <h2>✅ Respuesta guardada</h2>
-    <p>Tu respuesta fue: <b>{respuesta}</b></p>
-    <br>
-    <a href="/ver">🔎 Ver todas las respuestas</a>
+    <h2>✅ Guardado</h2>
+    <p>{respuesta}</p>
+    <a href="/ver">Ver datos</a>
     """
 
 
-# 🔥 Ver todos los datos
+# 🔥 VER
 @app.route("/ver")
 def ver():
-    return data.to_html()
+    df = cargar_datos()
+    return df.to_html()
 
 
-# 🔥 Ejecutar app
+# 🔥 ERROR HANDLER GLOBAL
+@app.errorhandler(Exception)
+def handle_error(e):
+    return f"❌ ERROR REAL:<br><br>{str(e)}", 500
+
+
 if __name__ == "__main__":
     app.run()
