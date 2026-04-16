@@ -22,7 +22,7 @@ def cargar_datos():
     return df
 
 
-# Buscar columna por nombre ignorando mayúsculas/minúsculas
+# Buscar columna ignorando mayúsculas y acentos exactos del archivo
 def obtener_columna(df, nombre_buscado):
     for col in df.columns:
         if col.strip().lower() == nombre_buscado.strip().lower():
@@ -45,16 +45,17 @@ def consultar():
     try:
         df = cargar_datos()
 
-        col_cedula = obtener_columna(df, "Cedula")
+        col_cedula = obtener_columna(df, "Cédula")
         col_nombre = obtener_columna(df, "Nombre")
         col_vacante = obtener_columna(df, "Vacante")
         col_fecha = obtener_columna(df, "Fecha")
         col_hora = obtener_columna(df, "Hora")
-        col_descripcion = obtener_columna(df, "Descripcion")
-        col_ubicacion = obtener_columna(df, "Ubicacion")
+        col_descripcion = obtener_columna(df, "Descripción")
+        col_direccion = obtener_columna(df, "Dirección")
+        col_link = obtener_columna(df, "Link")
 
         if not col_cedula:
-            return f"❌ Error en consulta: no se encontró la columna Cedula. Columnas detectadas: {list(df.columns)}"
+            return f"❌ Error en consulta: no se encontró la columna Cédula. Columnas detectadas: {list(df.columns)}"
 
         cedula_input = request.form.get("cedula")
         cedula_limpia = limpiar_cedula(cedula_input)
@@ -68,6 +69,10 @@ def consultar():
 
         fila = resultado.iloc[0]
 
+        link_html = ""
+        if col_link and pd.notna(fila[col_link]) and str(fila[col_link]).strip():
+            link_html = f'<p><b>Link:</b> <a href="{fila[col_link]}" target="_blank">Abrir enlace</a></p>'
+
         return f"""
         <h2>Resultado</h2>
         <p><b>Nombre:</b> {fila[col_nombre] if col_nombre else ''}</p>
@@ -75,7 +80,8 @@ def consultar():
         <p><b>Fecha:</b> {fila[col_fecha] if col_fecha else ''}</p>
         <p><b>Hora:</b> {fila[col_hora] if col_hora else ''}</p>
         <p><b>Descripción:</b> {fila[col_descripcion] if col_descripcion else ''}</p>
-        <p><b>Ubicación:</b> {fila[col_ubicacion] if col_ubicacion else ''}</p>
+        <p><b>Ubicación:</b> {fila[col_direccion] if col_direccion else ''}</p>
+        {link_html}
 
         <h3>¿Confirmas tu asistencia?</h3>
         <form action="/confirmar" method="POST">
