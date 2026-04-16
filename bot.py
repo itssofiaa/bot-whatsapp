@@ -1,72 +1,55 @@
 from flask import Flask, request, render_template
 import pandas as pd
-from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
-# Leer archivo CSV
-data = pd.read_csv("datos.csv", dtype=str)
+# Cargar datos
+data = pd.read_csv("datos.csv")
 
-# Limpiar nombres de columnas (por si hay espacios o caracteres raros)
-data.columns = data.columns.str.strip()
-
-print("COLUMNAS DETECTADAS:")
-print(data.columns)
-
-# =========================
-# 🌐 RUTA WEB (Render)
-# =========================
-@app.route("/", methods=["GET", "POST"])
+# Página principal (web)
+@app.route("/")
 def home():
-    resultado = None
+    return render_template("index.html")
 
-    if request.method == "POST":
-        cedula = request.form.get("cedula").strip()
+# Buscar por cédula desde la web
+@app.route("/buscar", methods=["POST"])
+def buscar():
+    cedula = request.form["cedula"]
 
-        resultado_df = data[data['Cedula'].str.strip() == cedula]
+    resultado = data[data['Cedula'].astype(str) == cedula]
 
-        if not resultado_df.empty:
-            resultado = resultado_df.iloc[0]
+    if resultado.empty:
+        return "<h2>No se encontró la cédula</h2>"
 
-    return render_template("index.html", resultado=resultado)
+    fila = resultado.iloc[0]
 
+    return f"""
+    <h2>Resultado:</h2>
+    Nombre: {fila['Nombre']} <br>
+    Correo: {fila['Correo']} <br>
+    Vacante: {fila['Vacante']} <br>
+    Lugar: {fila['Lugar']} <br>
+    Hora: {fila['Hora']}
+    """
 
-# =========================
-# 📲 RUTA WHATSAPP (Twilio)
-# =========================
+# Endpoint del bot de WhatsApp (NO LO BORRES)
 @app.route("/bot", methods=["POST"])
 def bot():
-    incoming_msg = request.values.get('Body', '').strip()
-
+    incoming_msg = request.form.get("Body")
     print("CÉDULA RECIBIDA:", incoming_msg)
 
-    resultado = data[data['Cedula'].str.strip() == incoming_msg]
+    resultado = data[data['Cedula'].astype(str) == incoming_msg]
 
-    resp = MessagingResponse()
+    if resultado.empty:
+        return "No encontramos tu cédula."
 
-    if not resultado.empty:
-        fila = resultado.iloc[0]
+    fila = resultado.iloc[0]
 
-        mensaje = f"""
-Hola {fila['Nombre']} 👋
-
-📌 Vacante: {fila['Vacante']}
+    return f"""Hola {fila['Nombre']} 👋
+Tu citación es:
 📍 Lugar: {fila['Lugar']}
 ⏰ Hora: {fila['Hora']}
+💼 Vacante: {fila['Vacante']}"""
 
-Por favor responde:
-👉 SI para confirmar asistencia
-👉 NO si no asistirás
-"""
-    else:
-        mensaje = "❌ No encontramos tu cédula. Verifica e intenta nuevamente."
-
-    resp.message(mensaje)
-    return str(resp)
-
-
-# =========================
-# 🚀 INICIO APP
-# =========================
 if __name__ == "__main__":
     app.run(debug=True)
