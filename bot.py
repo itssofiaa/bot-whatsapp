@@ -1,20 +1,37 @@
 from flask import Flask, request, render_template
 import pandas as pd
+import sqlite3
 
 app = Flask(__name__)
 
-# 🔥 DEBUG ACTIVADO
-app.config["DEBUG"] = True
+# 🔥 BASE DE DATOS
+def guardar_respuesta(cedula, respuesta):
+    conn = sqlite3.connect("respuestas.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS respuestas (
+            cedula TEXT,
+            respuesta TEXT
+        )
+    """)
+
+    cursor.execute("""
+        INSERT INTO respuestas (cedula, respuesta)
+        VALUES (?, ?)
+    """, (cedula, respuesta))
+
+    conn.commit()
+    conn.close()
 
 
-# 🔥 Leer datos siempre actualizados
+# 🔥 Leer CSV
 def cargar_datos():
     df = pd.read_csv("datos.csv", sep=None, engine="python")
     df.columns = df.columns.str.strip()
     return df
 
 
-# 🔥 Detectar columna de cédula
 def obtener_columna_cedula(df):
     for col in df.columns:
         if "cedula" in col.lower():
@@ -22,7 +39,6 @@ def obtener_columna_cedula(df):
     return None
 
 
-# 🔥 Limpiar cédula
 def limpiar_cedula(valor):
     return ''.join(filter(str.isdigit, str(valor)))
 
@@ -53,65 +69,48 @@ def consultar():
 
     return f"""
     <h2>Resultado</h2>
-    <p>✅ Nombre: {fila['Nombre']}</p>
-    <p>📍 Lugar: {fila['Lugar']}</p>
-    <p>🕒 Hora: {fila['Hora']}</p>
-    <p>💼 Vacante: {fila['Vacante']}</p>
+    <p>Nombre: {fila['Nombre']}</p>
+    <p>Lugar: {fila['Lugar']}</p>
+    <p>Hora: {fila['Hora']}</p>
+    <p>Vacante: {fila['Vacante']}</p>
 
     <h3>¿Confirmas tu asistencia?</h3>
     <form action="/confirmar" method="POST">
         <input type="hidden" name="cedula" value="{cedula_limpia}">
-        <button name="respuesta" value="SI">✅ Sí asistiré</button>
-        <button name="respuesta" value="NO">❌ No asistiré</button>
+        <button name="respuesta" value="SI">Sí asistiré</button>
+        <button name="respuesta" value="NO">No asistiré</button>
     </form>
     """
 
 
-# 🔥 CONFIRMAR ASISTENCIA
+# 🔥 CONFIRMAR (GUARDA EN DB)
 @app.route("/confirmar", methods=["POST"])
 def confirmar():
-    df = cargar_datos()
-    col_cedula = obtener_columna_cedula(df)
-
     cedula = limpiar_cedula(request.form.get("cedula"))
     respuesta = request.form.get("respuesta")
 
-    df[col_cedula] = df[col_cedula].apply(limpiar_cedula)
+    guardar_respuesta(cedula, respuesta)
 
-    # 🔥 Crear columna si no existe
-    if "Asistencia" not in df.columns:
-        df["Asistencia"] = ""
-
-    # 🔥 FORZAR A TEXTO (SOLUCIONA TU ERROR)
-    df["Asistencia"] = df["Asistencia"].astype(str)
-
-    # 🔥 Guardar respuesta
-    df.loc[df[col_cedula] == cedula, "Asistencia"] = respuesta
-
-    # 🔥 Guardar en carpeta segura de Render
-    df.to_csv("/tmp/datos_actualizados.csv", index=False)
-
-    return f"""
+    return """
     <h2>✅ Respuesta guardada</h2>
-    <p>Tu respuesta: <b>{respuesta}</b></p>
-    <br>
-    <a href="/ver">🔎 Ver todas las respuestas</a>
+    <p>Gracias por confirmar</p>
     """
 
 
-# 🔥 VER RESPUESTAS
-@app.route("/ver")
-def ver():
-    df = cargar_datos()
+# 🔒 OPCIONAL: VER RESPUESTAS (PROTEGER)
+@app.route("/admin")
+def admin():
+    clave = request.args.get("clave")
+
+    if clave != "1234":  # 🔥 cámbiala
+        return "⛔ Acceso denegado"
+
+    conn = sqlite3.connect("respuestas.db")
+    df = pd.read_sql_query("SELECT * FROM respuestas", conn)
+    conn.close()
+
     return df.to_html()
 
 
-# 🔥 CAPTURAR ERRORES
-@app.errorhandler(Exception)
-def handle_error(e):
-    return f"❌ ERROR REAL:<br><br>{str(e)}", 500
-
-
-# 🔥 RUN
 if __name__ == "__main__":
     app.run()
