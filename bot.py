@@ -10,7 +10,7 @@ url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 
 if not url or not key:
-    raise ValueError("Faltan SUPABASE_URL o SUPABASE_KEY en Render")
+    raise ValueError("Faltan SUPABASE_URL o SUPABASE_KEY")
 
 supabase = create_client(url, key)
 
@@ -20,14 +20,6 @@ def cargar_datos():
     df = pd.read_csv("datos.csv", sep=None, engine="python")
     df.columns = df.columns.str.strip()
     return df
-
-
-# 🔹 Detectar columna de cédula
-def obtener_columna_cedula(df):
-    for col in df.columns:
-        if "cedula" in col.lower():
-            return col
-    return None
 
 
 # 🔹 Limpiar cédula
@@ -46,14 +38,14 @@ def home():
 def consultar():
     try:
         df = cargar_datos()
-        col_cedula = obtener_columna_cedula(df)
 
         cedula_input = request.form.get("cedula")
         cedula_limpia = limpiar_cedula(cedula_input)
 
-        df[col_cedula] = df[col_cedula].apply(limpiar_cedula)
+        # Limpiar columna Cedula del CSV
+        df["Cedula"] = df["Cedula"].apply(limpiar_cedula)
 
-        resultado = df[df[col_cedula] == cedula_limpia]
+        resultado = df[df["Cedula"] == cedula_limpia]
 
         if resultado.empty:
             return "❌ No se encontró la cédula"
@@ -62,10 +54,12 @@ def consultar():
 
         return f"""
         <h2>Resultado</h2>
-        <p>Nombre: {fila['Nombre']}</p>
-        <p>Lugar: {fila['Lugar']}</p>
-        <p>Hora: {fila['Hora']}</p>
-        <p>Vacante: {fila['Vacante']}</p>
+        <p><b>Nombre:</b> {fila['Nombre']}</p>
+        <p><b>Vacante:</b> {fila['Vacante']}</p>
+        <p><b>Fecha:</b> {fila['Fecha']}</p>
+        <p><b>Hora:</b> {fila['Hora']}</p>
+        <p><b>Descripción:</b> {fila['Descripcion']}</p>
+        <p><b>Ubicación:</b> {fila['Ubicacion']}</p>
 
         <h3>¿Confirmas tu asistencia?</h3>
         <form action="/confirmar" method="POST">
@@ -78,18 +72,16 @@ def consultar():
         return f"❌ Error en consulta: {str(e)}"
 
 
-# 🔥 CONFIRMAR (INSERT o UPDATE)
+# 🔥 CONFIRMAR
 @app.route("/confirmar", methods=["POST"])
 def confirmar():
     try:
         cedula = limpiar_cedula(request.form.get("cedula"))
         respuesta = request.form.get("respuesta")
 
-        # 🔍 verificar si ya existe
         existente = supabase.table("respuestas").select("*").eq("cedula", cedula).execute()
 
         if existente.data:
-            # 🔄 actualizar
             supabase.table("respuestas").update({
                 "respuesta": respuesta
             }).eq("cedula", cedula).execute()
@@ -99,7 +91,6 @@ def confirmar():
             <p>Tu respuesta fue modificada correctamente.</p>
             """
         else:
-            # 🆕 insertar
             supabase.table("respuestas").insert({
                 "cedula": cedula,
                 "respuesta": respuesta
@@ -114,6 +105,5 @@ def confirmar():
         return f"❌ Error real: {str(e)}"
 
 
-# 🔥 RUN
 if __name__ == "__main__":
     app.run()
